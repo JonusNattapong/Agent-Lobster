@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.3.7"
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "kilocode/minimax/minimax-m2.5:free",
+        "fallbacks": []
+      },
+      "workspace": "~/.openclaw/workspace",
+      "heartbeat": {
+        "every": "30m",
+        "suppressToolErrorWarnings": false
+      }
+    },
+    "list": [
+      { "id": "main" },
+      { "id": "researcher" },
+      { "id": "writer" }
+    ]
+  },
+  "tools": {
+    "sessions": {
+      "visibility": "all"
+    },
+    "agentToAgent": {
+      "enabled": true
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback"
+  }
+}
