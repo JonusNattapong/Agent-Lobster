@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Agent Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">OpenClaw Control Plane</p>
+          <h1>จัดการ agent graph และ sub-agent policy ให้ตรงกับ OpenClaw จริง</h1>
+          <p class="hero__text">
+            ออกแบบเส้นทาง `sessions_spawn`, กำหนด allow list ของแต่ละ agent,
+            ตั้งค่า sub-agent defaults และ sync กลับเข้า OpenClaw ได้จากหน้าเดียว
+          </p>
+          <div class="hero__actions">
+            <button id="resetDemoBtn" class="btn btn--ghost" type="button">โหลดตัวอย่างใหม่</button>
+            <label class="btn btn--secondary" for="configUpload">นำเข้า JSON</label>
+            <input id="configUpload" type="file" accept="application/json" hidden />
+            <button id="downloadBtn" class="btn btn--primary" type="button">ดาวน์โหลด Config</button>
+          </div>
+          <div id="statusBanner" class="status-banner" data-tone="info">ยังไม่ได้เชื่อมต่อ OpenClaw</div>
+        </div>
+        <div class="hero__panel">
+          <div class="signal-card">
+            <span>Topology</span>
+            <strong id="topologyLabel">Hub-and-Spoke</strong>
+          </div>
+          <div class="signal-card">
+            <span>Agents</span>
+            <strong id="agentCount">0</strong>
+          </div>
+          <div class="signal-card">
+            <span>Spawn routes</span>
+            <strong id="subAgentCount">0</strong>
+          </div>
+          <div class="signal-card">
+            <span>Gateway</span>
+            <strong id="gatewayModeLabel">local</strong>
+          </div>
+          <div class="signal-card">
+            <span>OpenClaw version</span>
+            <strong id="openclawVersion">unknown</strong>
+          </div>
+          <div class="signal-card">
+            <span>Config path</span>
+            <strong id="configPath">~/.openclaw/openclaw.json</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="panel panel--wide">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Live Topology</p>
+              <h2>Spawn graph</h2>
+            </div>
+            <select id="topologySelect" class="select">
+              <option value="hub-and-spoke">Hub-and-Spoke</option>
+              <option value="pipeline">Pipeline</option>
+              <option value="swarm">Swarm</option>
+            </select>
+          </div>
+          <div id="topologyCanvas" class="topology"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Fleet Summary</p>
+              <h2>Runtime signals</h2>
+            </div>
+          </div>
+          <div class="stats">
+            <article class="stat-card">
+              <span>Main workspace</span>
+              <strong id="workspaceLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <span>Session tools visibility</span>
+              <strong id="visibilityLabel">spawned</strong>
+            </article>
+            <article class="stat-card">
+              <span>Agent-to-agent</span>
+              <strong id="a2aLabel">enabled</strong>
+            </article>
+            <article class="stat-card">
+              <span>Gateway port</span>
+              <strong id="portLabel">18789</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel panel--wide">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Agent Registry</p>
+              <h2>สร้าง agent และกำหนดเส้นทาง sub-agent</h2>
+            </div>
+            <button id="addAgentBtn" class="btn btn--primary" type="button">เพิ่ม Agent</button>
+          </div>
+          <div id="agentList" class="agent-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Sub-Agent Policy</p>
+              <h2>sessions_spawn defaults</h2>
+            </div>
+          </div>
+          <form id="subagentPolicyForm" class="settings-form">
+            <label>
+              Sub-agent model
+              <input id="subagentModel" class="input" type="text" placeholder="เช่น openai/gpt-5-mini" />
+            </label>
+            <label>
+              Max concurrent
+              <input id="maxConcurrent" class="input" type="number" min="0" />
+            </label>
+            <label>
+              Thinking
+              <input id="subagentThinking" class="input" type="text" placeholder="เช่น low, medium, high" />
+            </label>
+            <label>
+              Archive after minutes
+              <input id="archiveAfterMinutes" class="input" type="number" min="0" />
+            </label>
+            <p class="form-note">
+              อิงจาก `agents.defaults.subagents` ของ OpenClaw สำหรับ `sessions_spawn`
+            </p>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">OpenClaw Sync</p>
+              <h2>Control settings</h2>
+            </div>
+          </div>
+          <div class="sync-actions">
+            <button id="syncBtn" class="btn btn--primary" type="button">Sync เข้า OpenClaw</button>
+            <button id="refreshBtn" class="btn btn--ghost" type="button">Refresh จาก OpenClaw</button>
+            <button id="restartBtn" class="btn btn--secondary" type="button">Restart Gateway</button>
+            <button id="validateBtn" class="btn btn--ghost" type="button">Validate Config</button>
+          </div>
+          <form id="settingsForm" class="settings-form">
+            <label>
+              Gateway mode
+              <select id="gatewayMode" class="select">
+                <option value="local">local</option>
+                <option value="remote">remote</option>
+              </select>
+            </label>
+            <label>
+              Bind
+              <select id="gatewayBind" class="select">
+                <option value="loopback">loopback</option>
+                <option value="0.0.0.0">0.0.0.0</option>
+              </select>
+            </label>
+            <label>
+              Port
+              <input id="gatewayPort" class="input" type="number" min="1" max="65535" />
+            </label>
+            <label>
+              Session tools visibility
+              <select id="sessionVisibility" class="select">
+                <option value="spawned">spawned</option>
+                <option value="all">all</option>
+              </select>
+            </label>
+            <label class="checkbox">
+              <input id="agentToAgent" type="checkbox" />
+              เปิด agent-to-agent communication
+            </label>
+            <label>
+              Agent-to-agent allow
+              <input id="agentToAgentAllow" class="input" type="text" placeholder="เช่น main, researcher หรือ *" />
+            </label>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">JSON Preview</p>
+              <h2>Export พร้อมใช้งาน</h2>
+            </div>
+          </div>
+          <pre id="jsonPreview" class="json-preview"></pre>
+        </section>
+
+        <section class="panel panel--wide">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Live Runtime</p>
+              <h2>Agents from OpenClaw</h2>
+            </div>
+            <span id="runtimeRefreshedAt" class="runtime-meta">ยังไม่ refresh</span>
+          </div>
+          <div id="runtimeAgents" class="runtime-grid"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Sessions</p>
+              <h2>Recent session files</h2>
+            </div>
+          </div>
+          <div id="runtimeSessions" class="runtime-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Subagent Registry</p>
+              <h2>Active runs</h2>
+            </div>
+          </div>
+          <div id="runtimeSubagents" class="runtime-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow">Logs</p>
+              <h2>Recent log tail</h2>
+            </div>
+          </div>
+          <div id="runtimeLogs" class="runtime-list runtime-list--logs"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="agentCardTemplate">
+      <article class="agent-card">
+        <div class="agent-card__header">
+          <div>
+            <span class="agent-card__tag"></span>
+            <h3></h3>
+          </div>
+          <button class="icon-btn" data-action="delete" type="button">ลบ</button>
+        </div>
+        <div class="agent-card__fields">
+          <label>
+            ID
+            <input data-field="id" class="input" type="text" />
+          </label>
+          <label>
+            Display name
+            <input data-field="name" class="input" type="text" />
+          </label>
+          <label>
+            Role
+            <input data-field="role" class="input" type="text" />
+          </label>
+          <label>
+            Model
+            <input data-field="model" class="input" type="text" />
+          </label>
+          <label>
+            Workspace
+            <input data-field="workspace" class="input" type="text" />
+          </label>
+          <label>
+            Spawn targets
+            <input
+              data-field="spawnTargets"
+              class="input"
+              type="text"
+              placeholder="เช่น researcher, writer หรือ *"
+            />
+          </label>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -21,6 +21,7 @@
     ]
   },
   "tools": {
+    "profile": "coding",
     "sessions": {
       "visibility": "all"
     },
